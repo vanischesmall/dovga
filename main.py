@@ -40,41 +40,46 @@ class DocumentParser:
         statement = self.__remove_seal(statement)
         statement = self.__preprocess_page(statement)
 
+        table = utils.detect_table(statement)
 
-        img = cv2.cvtColor(statement, cv2.COLOR_GRAY2BGR)
+        if table is not None:
+            pass
+            # cv2.imshow('table', table)
 
-        conts = cv2.findContours(statement, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
-
-        table_cont = None
-        table_conts = [cont for cont in conts if cv2.contourArea(cont) > 1000] 
-        if len(table_conts): 
-            table_cont = max(table_conts, key=cv2.contourArea)
-            table_bbox = cv2.boundingRect(table_cont)
-
-
-            table_crop = statement[table_bbox[1]:table_bbox[1] + table_bbox[3], table_bbox[0]:table_bbox[0]+table_bbox[2]]
-            table = utils.detect_table_with_hough(table_crop)
-
-            table_data = pytesseract.image_to_string(table, lang='rus')
-            # print(table_data)
-
-            # table_data = pytesseract.image_to_data(table_crop, lang='rus', output_type=pytesseract.Output.DICT)
-            # for i in range(len(table_data['text'])):
-                # if table_data['conf'][i] < 6:
-                #     continue
-
-                # x, y, w, h = table_data["left"][i], table_data["top"][i], table_data["width"][i], table_data["height"][i] 
-                # rand_color = (randint(0, 255), randint(0, 255), randint(0, 255))
-
-                # cv2.rectangle(table, (x, y), (x+w, y+h), 0, -1)
-                # cv2.rectangle(table, (x, y), (x+w, y+h), rand_color, 4)
-
-            cv2.rectangle(img, 
-                          (table_bbox[0], table_bbox[1]),
-                          (table_bbox[0] + table_bbox[2], table_bbox[1] + table_bbox[3]),
-                          (0, 255, 0), 4)
-
-            cv2.imshow('table', table)
+        # img = cv2.cvtColor(statement, cv2.COLOR_GRAY2BGR)
+        # conts = cv2.findContours(statement, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
+        #
+        # table_cont = None
+        # table_conts = [cont for cont in conts if cv2.contourArea(cont) > 1000] 
+        # if len(table_conts): 
+        #     table_cont = max(table_conts, key=cv2.contourArea)
+        #     table_bbox = cv2.boundingRect(table_cont)
+        #
+        #
+        #
+        #     table_crop = statement[table_bbox[1]:table_bbox[1] + table_bbox[3], table_bbox[0]:table_bbox[0]+table_bbox[2]]
+        #     table = utils.detect_table_with_hough(table_crop)
+        #
+        #     table_data = pytesseract.image_to_string(table, lang='rus')
+        #     # print(table_data)
+        #
+        #     # table_data = pytesseract.image_to_data(table_crop, lang='rus', output_type=pytesseract.Output.DICT)
+        #     # for i in range(len(table_data['text'])):
+        #         # if table_data['conf'][i] < 6:
+        #         #     continue
+        #
+        #         # x, y, w, h = table_data["left"][i], table_data["top"][i], table_data["width"][i], table_data["height"][i] 
+        #         # rand_color = (randint(0, 255), randint(0, 255), randint(0, 255))
+        #
+        #         # cv2.rectangle(table, (x, y), (x+w, y+h), 0, -1)
+        #         # cv2.rectangle(table, (x, y), (x+w, y+h), rand_color, 4)
+        #
+        #     cv2.rectangle(img, 
+        #                   (table_bbox[0], table_bbox[1]),
+        #                   (table_bbox[0] + table_bbox[2], table_bbox[1] + table_bbox[3]),
+        #                   (0, 255, 0), 4)
+        #
+        #     cv2.imshow('table', table)
 
 
         # img = cv2.cvtColor(statement, cv2.COLOR_GRAY2BGR)
@@ -84,10 +89,10 @@ class DocumentParser:
         #     cv2.line(img,(x1,y1),(x2,y2),(0,255,0),2)
 
         self.__update_page()
-        return self.__doc_end, img
+        return self.__doc_end, statement
     
     def __detect_table(self, page):
-        ret = utils.detect_table_with_hough(page)
+        ret = utils.detect_table(page)
 
         return ret
 
