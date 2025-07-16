@@ -3,7 +3,6 @@ import pytesseract
 
 from pdf2image import convert_from_path
 
-import io
 import cv2
 import imutils
 import numpy as np
@@ -17,6 +16,8 @@ SEAL_HSV = (
     np.array([180, 255, 255]),
 )
 SCAN_PATH = 'scans/input.pdf'
+
+Mat = np.ndarray
 
 
 class DocumentParser:
@@ -33,87 +34,55 @@ class DocumentParser:
 
         print(f'Pages scanned: {self.__doc_len}')
 
-    def get_statement(self):
-        statement = self.__doc[self.__page_index] 
+    def get_statement(self) -> Mat:
+        pages = [] 
 
-        statement = self.__autorotate(statement)
-        statement = self.__remove_seal(statement)
-        statement = self.__preprocess_page(statement)
+        start_page_idx = self.__page_index
+        while True: 
+            page = self.__doc[self.__page_index] 
+            seal, page = self.__remove_seal(page)
 
-        table = utils.detect_table(statement)
+            page = self.__autorotate(page)
+            page = self.__preprocess_page(page) 
 
-        if table is not None:
-            pass
-            # cv2.imshow('table', table)
+            pages.append(page)
+            self.__update_page()
 
-        # img = cv2.cvtColor(statement, cv2.COLOR_GRAY2BGR)
-        # conts = cv2.findContours(statement, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
-        #
-        # table_cont = None
-        # table_conts = [cont for cont in conts if cv2.contourArea(cont) > 1000] 
-        # if len(table_conts): 
-        #     table_cont = max(table_conts, key=cv2.contourArea)
-        #     table_bbox = cv2.boundingRect(table_cont)
-        #
-        #
-        #
-        #     table_crop = statement[table_bbox[1]:table_bbox[1] + table_bbox[3], table_bbox[0]:table_bbox[0]+table_bbox[2]]
-        #     table = utils.detect_table_with_hough(table_crop)
-        #
-        #     table_data = pytesseract.image_to_string(table, lang='rus')
-        #     # print(table_data)
-        #
-        #     # table_data = pytesseract.image_to_data(table_crop, lang='rus', output_type=pytesseract.Output.DICT)
-        #     # for i in range(len(table_data['text'])):
-        #         # if table_data['conf'][i] < 6:
-        #         #     continue
-        #
-        #         # x, y, w, h = table_data["left"][i], table_data["top"][i], table_data["width"][i], table_data["height"][i] 
-        #         # rand_color = (randint(0, 255), randint(0, 255), randint(0, 255))
-        #
-        #         # cv2.rectangle(table, (x, y), (x+w, y+h), 0, -1)
-        #         # cv2.rectangle(table, (x, y), (x+w, y+h), rand_color, 4)
-        #
-        #     cv2.rectangle(img, 
-        #                   (table_bbox[0], table_bbox[1]),
-        #                   (table_bbox[0] + table_bbox[2], table_bbox[1] + table_bbox[3]),
-        #                   (0, 255, 0), 4)
-        #
-        #     cv2.imshow('table', table)
+            if seal or self.__doc_end: 
+                break
 
+        statement = np.vstack(pages)
+        table_data = utils.extract_table_data(pages, pages_idxs=[idx + 1 for idx in range(start_page_idx, self.__page_index)])
 
-        # img = cv2.cvtColor(statement, cv2.COLOR_GRAY2BGR)
-        # lines = cv2.HoughLinesP(statement,1,np.pi/180,100,minLineLength=50,maxLineGap=5)
-        # for line in lines:
-        #     x1,y1,x2,y2 = line[0]
-        #     cv2.line(img,(x1,y1),(x2,y2),(0,255,0),2)
+        for date, fine in table_data.items(): 
+            print(f'{date}: {fine}')
 
-        self.__update_page()
-        return self.__doc_end, statement
-    
-    def __detect_table(self, page):
-        ret = utils.detect_table(page)
+        cv2.imshow('statement', statement)
+        while cv2.waitKey(1) != ord('n'): pass
 
-        return ret
+        return statement
 
-    def __preprocess_page(self, page):
+    def __preprocess_page(self, page) -> Mat:
         return cv2.adaptiveThreshold(
             self.__clahe.apply(cv2.GaussianBlur(cv2.cvtColor(page, cv2.COLOR_BGR2GRAY), (9, 9), 0)), 255, 
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,
             15, 15,
         )
 
-    def __remove_seal(self, page): 
+    def __remove_seal(self, page) -> tuple[bool, Mat]: 
         hsv_page = cv2.cvtColor(page, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv_page, *SEAL_HSV)
 
-
-        return cv2.bitwise_not(
+        seal = any(
+            cv2.contourArea(cont) > 1000 
+            for cont in cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0])
+        page = cv2.bitwise_not(
             cv2.cvtColor(255-mask, cv2.COLOR_GRAY2BGR), 
-            page, mask=mask
-        )
+            page, mask=mask)
 
-    def __autorotate(self, page): 
+        return seal, page
+
+    def __autorotate(self, page) -> Mat: 
         osd = pytesseract.image_to_osd(page) 
         angle = re.search("(?<=Rotate: )\d+", osd)
 
@@ -121,8 +90,9 @@ class DocumentParser:
             page = imutils.rotate_bound(page, float(angle.group(0)))
         return page
     
-    def __update_page(self): 
+    def __update_page(self) -> None: 
         print(self.__page_index)
+
         self.__page_index += 1
         if self.__page_index == self.__doc_len: 
             self.__doc_end = True 
@@ -142,14 +112,17 @@ class DocumentParser:
 
         return page
 
+    @property
+    def end(self):
+        return self.__doc_end
 
 def main():
     doc_parser = DocumentParser()
 
     while True:
-        end, statement = doc_parser.get_statement()
+        statement = doc_parser.get_statement()
 
-        if end:
+        if doc_parser.end:
             print('End')
             break
 
