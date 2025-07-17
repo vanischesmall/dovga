@@ -7,7 +7,8 @@ import numpy as np
 from collections import defaultdict
 
 Mat = np.ndarray
-OCR_CONFIG = r'--oem 3 --psm 6 -c tessedit_char_whitelist=-.0123456789'
+
+NUMERIC_OCR_CONFIG = r'--oem 3 --psm 6 -c tessedit_char_whitelist=-.0123456789'
 
 def get_moment_c(moments) -> tuple[int, int]: 
     try: cx = moments['m10'] // moments['m00']
@@ -32,6 +33,39 @@ def polygon_from_lines(line_a, line_b):
         tuple(line_b[line_b[:, :, 1].argmin()][0]),
         tuple(line_b[line_b[:, :, 1].argmax()][0]),
     ])
+
+
+def get_statement_type(src: Mat): 
+    H, W = src.shape 
+    img = cv2.cvtColor(src, cv2.COLOR_GRAY2BGR)
+
+    title_roi = tuple(map(int, (
+        0.25 * W, # x1
+        0.02 * H, # y1 
+        0.75 * W, # x2
+        0.13 * H, # y2
+    )))
+
+    title_crop = src[title_roi[1]:title_roi[3], title_roi[0]:title_roi[2]]
+    title_crop = cv2.dilate(title_crop, np.ones((5, 5), np.uint8))
+    # dilated = cv2.dilate(page, cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1)), iterations=2)
+
+    cv2.rectangle(img, (title_roi[0], title_roi[1]), (title_roi[2], title_roi[3]), (0, 255, 0), 4)
+
+
+
+    cv2.imshow('img', img)
+    cv2.imshow('title', title_crop)
+
+    return 'N/A'
+
+
+
+
+
+
+
+
 
 def extract_table_data(statement: list[Mat], pages_idxs: list[int]) -> defaultdict:
     curr_row = 0 
@@ -92,8 +126,8 @@ def extract_table_data(statement: list[Mat], pages_idxs: list[int]) -> defaultdi
             l_crop = 255 - table[max(0, l_bbox[1] - int(0.1 * l_bbox[3])):l_bbox[1] + l_bbox[3], l_bbox[0]:l_bbox[0] + l_bbox[2]]
             r_crop = 255 - table[max(0, r_bbox[1] - int(0.1 * l_bbox[3])):r_bbox[1] + r_bbox[3], r_bbox[0]:r_bbox[0] + r_bbox[2]]
 
-            date = pytesseract.image_to_string(l_crop, config=OCR_CONFIG) or 'NULL'
-            fine = pytesseract.image_to_string(r_crop, config=OCR_CONFIG) or 'NULL'
+            date = pytesseract.image_to_string(l_crop, config=NUMERIC_OCR_CONFIG) or 'NULL'
+            fine = pytesseract.image_to_string(r_crop, config=NUMERIC_OCR_CONFIG) or 'NULL'
 
             if date == 'NULL' or fine == 'NULL': 
                 print(f'Ошибка при обработке {curr_row} строки на странице {pages_idxs[curr_page]}')
