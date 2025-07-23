@@ -42,6 +42,7 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "opencv-python" },
     { name = "pdf2image" },
+    { name = "prettyprint" },
     { name = "pytesseract" },
     { name = "scikit-image", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -56,6 +57,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "opencv-python", specifier = ">=4.11.0.86" },
     { name = "pdf2image", specifier = ">=1.17.0" },
+    { name = "prettyprint", specifier = ">=0.1.5" },
     { name = "pytesseract", specifier = ">=0.3.13" },
     { name = "scikit-image", specifier = ">=0.24.0" },
 ]
@@ -1098,6 +1100,12 @@ pandas = [
     { name = "pandas" },
     { name = "pyarrow" },
 ]
+
+[[package]]
+name = "prettyprint"
+version = "0.1.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/13/9c/495a32e19f94fdd402bffc1c90abd84f2f604595ab480a3087dd77a94502/prettyprint-0.1.5.tar.gz", hash = "sha256:7423210b62adfb3777677914cd25db4919f1c2b0afba0454365ffbfa3f7e3731", size = 2119, upload-time = "2012-02-23T19:30:55.708Z" }
 
 [[package]]
 name = "pyarrow"

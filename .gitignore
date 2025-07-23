@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Assets 
+/assets/*
+
+# Other 
+.DS_Store
+.ruff_cache/
+.ropeproject/

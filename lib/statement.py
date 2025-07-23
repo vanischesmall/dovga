@@ -1,87 +1,371 @@
+import re
 import cv2 
 import numpy as np
-
 import pytesseract
-from .page import Page
-from .text_opetations import text_confidence 
 
-from enum import Enum
-from typing import List
+from .page import Page
+from .regexs import Patterns, get_float
+from .table_parser import parse_table
+from .text_opetations import text_confidence
+
+from typing import Union, Optional
+from collections import defaultdict
+
+
+
+TEXT_CONFIDENCE = 60
+
+CYRRILLIC_ALPHABET = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789'.lower()
+NUMERIC_OCR_CONFIG = r'--oem 3 --psm 6 -c tessedit_char_whitelist=-.0123456789'
+
+STREETS = [street.strip() for street in open('./assets/streets.txt')]
+
+
+
+from random import randint
+def randcolor() -> tuple[int, ...]:
+    return (randint(0, 255), randint(0, 255), randint(0, 255))
+
+def get_geom_c(x, y, w, h) -> tuple[int, int]: 
+    return x + w // 2, y + h // 2
 
 
 
 class Statement(object):
     TYPES = {
-        "Справка": "Справка",
-        "Реестр": "Реестр Начисления Пени",
-        "Расчет": "Расчет суммы искового заявления о взыскании задолженности",
+        "справка": "Справка",
+        "реестр": "Реестр",
+        "расчет": "Расчет",
     }
 
-    def __init__(self) -> None: 
-        self.__pages: List[Page] = []
+    MONTHES_FR = (
+        'января',
+        'февраля',
+        'марта',
+        'апреля',
+        'мая',
+        'июня',
+        'июля',
+        'августа',
+        'сентября',
+        'октября',
+        'ноября',
+        'декабря',
+    )
 
-        self.__type: str = 'N/A'
-        self.__type_confidence: int = 0
+    MONTHES_TO = (
+        'январь',
+        'февраль',
+        'март',
+        'апрель',
+        'май',
+        'июнь',
+        'июль',
+        'август',
+        'сентябрь',
+        'октябрь',
+        'ноябрь',
+        'декабрь',
+    )
+
+    def __init__(self) -> None: 
+        self.__pages: list[Page] = []
+
+        self.__type: Union[str, None] = None
+        self.__period: Union[dict, None] = None
+        self.__address: Union[dict, None] = None
+        self.__ca_number: Union[str, None] = None
+        self.__total: Union[float, None] = None
+        
+        self.__fine_table: Union[defaultdict, None] = None
 
     def get_type(self) -> "Statement":
-        self.__crop_title()
+        self.__process_title() 
 
-        title_data = [
-            line for line in pytesseract.image_to_string(self.__title, lang='rus').split('\n') if line]
+        for i in range(len(self.__title_data['text'])):
+            if not self.__title_data['text'][i]:# or self.__title_data['conf'][i] < TEXT_CONFIDENCE:
+                continue
 
-        for statement_type, statement_pattern in Statement.TYPES.items():
-            if any((conf := text_confidence(statement_pattern, line)) > 0.6 for line in title_data):
-                print(title_data)
-                self.__type = statement_type 
-                self.__type_confidence = int(conf * 100)
-                break 
-        # else: raise Exception
+            for statement_type, statement_pattern in Statement.TYPES.items():
+                if text_confidence(statement_pattern, self.__title_data['text'][i]) < TEXT_CONFIDENCE: 
+                    continue 
+
+                self.__type = statement_type
+                self.__display_text_rect(
+                    self.__pages[0].src, self.__title_data, i, crop_rect=self.__title_rect)
+                break
+
+            if self.__type is not None:
+                break
+        return self
+
+    def get_period(self) -> "Statement":
+        if self.__type is None or self.__type == 'реестр':
+            print(f'[WARN] Getting period from page {-1}: Type is {self.__type}')
+            return self
+
+        _month_fr: Union[dict, None] = None
+        _month_to: Union[dict, None] = None
+        for idx in range(len(self.__title_data['text'])):
+            if not self.__title_data['text'][idx]:# or self.__title_data['conf'][i] < TEXT_CONFIDENCE:
+                continue
+
+            string = self.__title_data['text'][idx]
+            for fr_pattern, to_pattern in zip(Statement.MONTHES_FR, Statement.MONTHES_TO):
+                fr_conf: int = text_confidence(fr_pattern, string)
+                if _month_fr is None or fr_conf > _month_fr['conf']: 
+                    _month_fr = { 'value': string, 'conf': fr_conf, 'idx': idx }
+
+                to_conf: int = text_confidence(to_pattern, string)
+                if _month_to is None or to_conf > _month_to['conf']: 
+                    _month_to = { 'value': string, 'conf': to_conf, 'idx': idx }
+
+        year_fr:  Union[int, None] = None
+        month_fr: Union[int, None] = None
+        if _month_fr is not None:
+            year_fr = re.findall(Patterns.YEAR, self.__title_data['text'][_month_fr['idx'] + 1])[0]
+            month_fr = Statement.MONTHES_FR.index(_month_fr['value']) + 1
+
+            self.__display_text_rect(
+                self.title_page, self.__title_data, _month_fr['idx'],     crop_rect=self.__title_rect, color=(255, 255, 0))
+            self.__display_text_rect(
+                self.title_page, self.__title_data, _month_fr['idx'] + 1, crop_rect=self.__title_rect, color=(255, 255, 0))
+
+        year_to:  Union[int, None] = None
+        month_to: Union[int, None] = None
+        if _month_to is not None:
+            year_to = re.findall(Patterns.YEAR, self.__title_data['text'][_month_to['idx'] + 1])[0]
+            month_to = Statement.MONTHES_TO.index(_month_to['value']) + 1
+
+            self.__display_text_rect(
+                self.title_page, self.__title_data, _month_to['idx'],     crop_rect=self.__title_rect, color=(0, 255, 255))
+            self.__display_text_rect(
+                self.title_page, self.__title_data, _month_to['idx'] + 1, crop_rect=self.__title_rect, color=(0, 255, 255))
+
+        self.__period = {
+            'from': { 'year': year_fr, 'month': month_fr },
+            'to'  : { 'year': year_to, 'month': month_to },
+        }
 
         return self
 
-    def process(self) -> str: 
-        self.get_type()
+    def get_ca_number(self) -> "Statement":
+        if self.__type in [None, 'справка']:
+            print(f'[WARN] Getting CA from page {-1}: Type is {self.__type}')
+            return self
 
-        cv2.imshow('Title Page', self.__pages[0].src)
-        while cv2.waitKey(1) != ord('n'): pass
+        # find "Лицевой счет"
+        idx, ca = max(
+            [
+                (i, f'{a} {b}')
+                for i, (a, b) in enumerate(zip(self.__title_data['text'], self.__title_data['text'][1:]))
+                if a and b #and (self.__title_data['conf'][i] + self.__title_data['conf'][i+1] // 2 >= TEXT_CONFIDENCE)
+            ],
+            key=lambda x: text_confidence('лицевой счет', x[1]) 
+        ) 
+        # assert text_confidence('лицевой счет', ca) >= TEXT_CONFIDENCE, f'[ERROR] No CA on page {-1}. Best match - {ca}'
+        self.__display_text_rect(self.__pages[0].src, self.__title_data, idx+1, crop_rect=self.__title_rect, color=(0, 255, 0))
+
+        x, y, w, h = Statement.data_to_bbox(self.__title_data, idx + 1, self.__title_rect) # idx + 1 because we use счет
+        y = max(0, y - 20)
+        x = x + w 
+        w = w * 8
+        h = h + 30
+
+        ca_crop = self.__pages[0].bin[y:y + h, x:x + w]
+        # cv2.imshow('ca raw', ca_crop)
+
+        ca_number_str = pytesseract.image_to_string(ca_crop, lang='eng', config=NUMERIC_OCR_CONFIG).strip()
+        ca_number = re.findall(Patterns.CA, ca_number_str) or None
+
+        if ca_number is None: 
+            print(f'[ERROR] Could not find correct CA: {ca_number_str}')
+            return self 
+
+        self.__ca_number = 'P' + ca_number[0]
+
+        cv2.rectangle(self.__pages[0].src, (x, y), (x + w, y + h), (0, 255, 0), 3)
+
+        return self
+
+    def get_address(self) -> "Statement":
+        self.__address = {
+            'street': None,
+            'house': None,
+            'aparts': None,
+        }
+
+        idx, addr = max(
+            [
+                (i, string)#, text_confidence('адрес', string)) 
+                for i, string in enumerate(self.__title_data['text']) 
+                if string #and self.__title_data['conf'][i] >= TEXT_CONFIDENCE
+            ],
+            key=lambda x: text_confidence('адрес', x[1])
+        )
+        # assert text_confidence('адрес', addr) >= TEXT_CONFIDENCE, f'[ERROR] No address on page. Best match - {addr}'
+        self.__display_text_rect(self.__pages[0].src, self.__title_data, idx, crop_rect=self.__title_rect, color=(0, 255, 0))
+
+        x, y, w, h = Statement.data_to_bbox(self.__title_data, idx, self.__title_rect)
+        y = max(0, y - 10)
+        x = x + w + 20 
+        w = w * 10
+        h = h + 20
+
+        address_crop = self.__pages[0].bin[y:y + h, x:x + w]
+        for cont in cv2.findContours(address_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]:
+            if cv2.contourArea(cont) < 50:
+                cv2.fillPoly(address_crop, [cont], (0, 0, 0))
+
+        address_list: list = pytesseract.image_to_string(
+            address_crop, lang='rus').lower().replace('.', ' ').replace(',', ' ').split()
+
+        raw_street = ''.join(
+            address_list[address_list.index('ул') + 1 if 'ул' in address_list else 0:address_list.index('д')])
+        self.__address['street'] = max(
+            STREETS,
+            key=lambda s: text_confidence(s, raw_street)
+        )
+        self.__address['house']     = ''.join(address_list[address_list.index('д' ) + 1:address_list.index('кв')])
+        self.__address['aparts']    = ''.join(address_list[address_list.index('кв') + 1:])
+
+        cv2.rectangle(self.__pages[0].src, (x, y), (x + w, y + h), (0, 255, 0), 3)
+
+        # cv2.imshow('address_processed', address_crop)
+        return self
+
+    def get_payments_total(self) -> "Statement":
+        table_cont = max(
+            cv2.findContours(self.__pages[0].bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0],
+            key=lambda cont: cv2.contourArea(cont),
+        )
+        table_bbox = cv2.boundingRect(table_cont) 
+        cv2.drawContours(self.__pages[0].dst, [table_cont], -1, (0, 255, 0), 5)
+
+        table_mask = np.zeros(self.__pages[0].bin.shape, np.uint8)
+        cv2.fillPoly(table_mask, [table_cont], (255, 255, 255))
+
+        x, y, w, h = table_bbox
+        table = (self.__pages[0].bin & table_mask)[y:y + h, x:x + w]
+        ver_lines_mask = cv2.morphologyEx(
+            table, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50)), iterations=2)
+        hor_lines_mask = cv2.morphologyEx(
+            table, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1)), iterations=2)
+
+        table_struct = cv2.dilate(cv2.add(hor_lines_mask, ver_lines_mask), np.ones((7, 7), np.uint8))
+        cell_conts = cv2.findContours(table_struct, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
+
+        total_cell_cont = max(cell_conts, key=lambda cont: get_geom_c(*cv2.boundingRect(cont)))
+        total_cell_bbox = cv2.boundingRect(total_cell_cont)
+
+        x, y, w, h = total_cell_bbox
+        total_cell = table[y:y + h, x:x + w]
+
+        total_summ_raw = pytesseract.image_to_string(total_cell, lang='eng', config=NUMERIC_OCR_CONFIG)
+        total_summ = get_float(total_summ_raw)
+
+        if total_summ is None: 
+            print(f'[ERROR] Total summ is None')
+            return self
+
+        self.__total = float(total_summ)
+
+        cv2.putText(
+            self.__pages[0].dst, f'{self.__total}', 
+            (table_bbox[0], table_bbox[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 5)
+
+        # table_img = cv2.cvtColor(table, cv2.COLOR_GRAY2BGR)
+        # cv2.rectangle(table_img, (x ,y), (x + w, y + h), (0, 255, 0), 5)
+        # cv2.imshow('table', table_img)
+        # cv2.imshow('total_cell', total_cell)
+
+        return self
+
+    def process(self) -> dict: 
+        self.get_type().get_address()
+
+        match self.__type:
+            case "справка":
+                self.get_period().get_payments_total()
+
+            case "реестр":
+                self.get_ca_number()
+                self.__fine_table = parse_table(
+                    [page.bin for page in self.__pages],
+                    [page.idx for page in self.__pages],
+                )
+
+            case "расчет":
+                self.get_period().get_ca_number()
+
+        self.__generate_description()
+
         
-        # title_crop = cv2.dilate(title_crop, np.ones((5, 5), np.uint8))
-        # dilated = cv2.dilate(page, cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1)), iterations=2)
-        return ''
+        return self.__description
 
-
-    def __crop_title(self) -> "Statement":
+    def __process_title(self) -> "Statement":
         H, W = self.__pages[0].bin.shape
 
         self.__title_rect: tuple[int, ...] = tuple(map(int, (
             0.01 * W, 0.02 * H,
-            0.75 * W, 0.13 * H
+            0.75 * W, 0.3 * H
         )))
-        self.__title: np.ndarray = self.__pages[0].bin[
+        self.__title_page: np.ndarray = self.__pages[0].bin[
             self.__title_rect[1]:self.__title_rect[3], 
             self.__title_rect[0]:self.__title_rect[2],
         ]
 
-        cv2.rectangle(self.__pages[0].src, 
-                      (self.__title_rect[0], self.__title_rect[1]), 
-                      (self.__title_rect[2], self.__title_rect[3]), 
-                      (0, 255, 0), 5)
+        self.__title_data: dict = pytesseract.image_to_data(
+            self.__title_page, lang='rus', output_type=pytesseract.Output.DICT)
+
+        # cv2.rectangle(self.__pages[0].src, 
+        #               (self.__title_rect[0], self.__title_rect[1]), 
+        #               (self.__title_rect[2], self.__title_rect[3]), 
+        #               (0, 255, 0), 5
+        # )
 
         return self
 
+    def __generate_description(self) -> dict: 
+        _fine_table_value = 'defined' if self.__fine_table is not None else None
 
-    def __get_title1(self, src: np.ndarray) -> tuple[np.ndarray, tuple[int, ...]]:
-        H, W = src.shape 
+        self.__description = {
+            'type': self.__type,
+            'total': self.__total,
+            'period': self.__period,
+            'address': self.__address,
+            'ca_number': self.__ca_number,
+            'fine_table': _fine_table_value,
+        }
 
-        rect = tuple(map(int, (
-            0.01 * W, 0.02 * H,
-            0.75 * W, 0.13 * H
-        )))
-        title = src[rect[1]:rect[3], rect[0]:rect[2]]
+        return self.__description
 
-        return title, rect 
+    def __display_text_rect(
+        self,
+        src: np.ndarray,
+        data: dict, 
+        i: int, 
+        text: str = '', 
+        crop_rect: tuple[int, ...] = (0, 0, 0, 0), 
+        color: tuple[int, ...] = (0, 255, 0),
+    ) -> None:
+        x, y, w, h = Statement.data_to_bbox(data, i, crop_rect)
 
+        cv2.rectangle(src, (x, y), (x+w, y+h), color, 3)
+        if text:
+            cv2.putText(
+                src, text,
+                (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3, cv2.LINE_AA,
+            )
 
+    @staticmethod
+    def data_to_bbox(data: dict, i: int, crop_rect = (0, 0, 0, 0)) -> tuple[int, ...]:
+        x = data['left'][i] + crop_rect[0]
+        y = data['top'][i]  + crop_rect[1]
+        w = data['width'][i]
+        h = data['height'][i]
+
+        return x, y, w, h
 
     def add_page(self, page: Page) -> None: 
         self.__pages.append(page)
@@ -93,10 +377,30 @@ class Statement(object):
         return self.__pages[page_idx].idx
 
     @property 
-    def type(self):
-        return self.__type
+    def title_page(self):
+        return self.__pages[0].src
 
     @property 
-    def type_confidence(self):
-        return self.__type_confidence
+    def period(self):
+        return self.__period
+
+    @property 
+    def address(self):
+        return self.__address
+
+    @property
+    def description(self):
+        return self.__description
+
+    @property 
+    def type(self):
+        return self.__type
+    
+    @property 
+    def total(self) -> Union[float, None]:
+        return self.__total
+
+    @property 
+    def fine_table(self) -> Union[defaultdict, None]: 
+        return self.__fine_table
 
