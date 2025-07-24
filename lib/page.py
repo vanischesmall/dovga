@@ -48,7 +48,7 @@ class Page(object):
             cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV,
             21, 21,
         )
-        self.__dst = cv2.cvtColor(self.__bin, cv2.COLOR_GRAY2BGR)
+        self.dst = cv2.cvtColor(self.__bin, cv2.COLOR_GRAY2BGR)
 
         return self
 
@@ -70,11 +70,11 @@ class Page(object):
 
     @property
     def src(self) -> np.ndarray:
-        return self.__dst
+        return self.__src
 
-    @property
-    def dst(self) -> np.ndarray:
-        return self.__dst
+    # @property
+    # def dst(self) -> np.ndarray:
+    #     return self.__dst
 
     @property 
     def bin(self) -> np.ndarray: 

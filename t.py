@@ -8,6 +8,4 @@ if s[-1] == '-':
 s = s[-14:]
 print(s)
 
-print(text_confidence('адрес', 'Адрее'))
-
-print(float('1,0444'))
+print(text_confidence('иголя', 'июля'))
