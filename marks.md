@@ -1,0 +1,5 @@
+- total2 
+- use finetuned ocr model
+- glue statements 
+- add masha's funcs 
+- connect app with main 
