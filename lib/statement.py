@@ -78,7 +78,6 @@ class Statement(object):
         self.__period: Union[dict, None] = None
         self.__address: Union[dict, None] = None
         self.__ca_number: Union[str, None] = None
-
         self.__fine_table: Union[defaultdict, None] = None
 
     def get_type(self) -> "Statement":
@@ -112,45 +111,65 @@ class Statement(object):
             if not self.__title_data['text'][idx]:
                 continue
 
-
             string = self.__title_data['text'][idx]
-            for fr_pattern, to_pattern in zip(Statement.MONTHES_FR, Statement.MONTHES_TO):
-                if 'го' in string: 
-                    string = string.replace('го', 'ю')
+            if string == 'дата':
+                continue 
 
+            for fr_pattern, to_pattern in zip(Statement.MONTHES_FR, Statement.MONTHES_TO):
                 fr_conf: int = text_confidence(fr_pattern, string)
                 to_conf: int = text_confidence(to_pattern, string)
 
                 if _month_fr is None or fr_conf > _month_fr['conf'] and fr_conf > to_conf: 
-                    _month_fr = { 'value': string.lower(), 'conf': fr_conf, 'idx': idx }
+                    _month_fr = { 'value': fr_pattern.lower(), 'conf': fr_conf, 'idx': idx }
 
                 if _month_to is None or to_conf > _month_to['conf'] and to_conf > fr_conf: 
-                    _month_to = { 'value': string.lower(), 'conf': to_conf, 'idx': idx }
-
-        # print(_month_fr)
-        # print(_month_to)
+                    _month_to = { 'value': to_pattern.lower(), 'conf': to_conf, 'idx': idx }
 
         year_fr:  Union[int, None] = None
         month_fr: Union[int, None] = None
-        if _month_fr is not None:
-            year_fr = re.findall(Patterns.YEAR, self.__title_data['text'][_month_fr['idx'] + 1])[0]
-            month_fr = Statement.MONTHES_FR.index(_month_fr['value']) + 1
+        try:
+            if _month_fr is not None:
+                year_fr = int(re.findall(Patterns.YEAR, self.__title_data['text'][_month_fr['idx'] + 1])[0])
+                month_fr = Statement.MONTHES_FR.index(_month_fr['value']) + 1
 
-            self.__display_text_rect(
-                self.title_page, self.__title_data, _month_fr['idx'],     crop_rect=self.__title_rect, color=(255, 0, 255))
-            self.__display_text_rect(
-                self.title_page, self.__title_data, _month_fr['idx'] + 1, crop_rect=self.__title_rect, color=(255, 0, 255))
+                self.__display_text_rect(
+                    self.title_page, self.__title_data, _month_fr['idx'],     crop_rect=self.__title_rect, color=(255, 0, 255))
+                self.__display_text_rect(
+                    self.title_page, self.__title_data, _month_fr['idx'] + 1, crop_rect=self.__title_rect, color=(255, 0, 255))
+        except:
+            cv2.imshow('Period', self.__title_page)
+            cv2.waitKey(1)
+
+            print(f'\nОшибка при обработке периода: {_month_fr}')
+            while True:
+                try:
+                    month_fr, year_fr = map(int, input('Введите дату начала периода в формате <номер месяца> <год>: ').split())
+                    break
+                except:
+                    print('Неправильный формат ввода, повторите попытку')
 
         year_to:  Union[int, None] = None
         month_to: Union[int, None] = None
-        if _month_to is not None:
-            year_to = re.findall(Patterns.YEAR, self.__title_data['text'][_month_to['idx'] + 1])[0]
-            month_to = Statement.MONTHES_TO.index(_month_to['value']) + 1
+        try:
+            if _month_to is not None:
+                year_to = int(re.findall(Patterns.YEAR, self.__title_data['text'][_month_to['idx'] + 1])[0])
+                month_to = Statement.MONTHES_TO.index(_month_to['value']) + 1
 
-            self.__display_text_rect(
-                self.title_page, self.__title_data, _month_to['idx'],     crop_rect=self.__title_rect, color=(0, 255, 255))
-            self.__display_text_rect(
-                self.title_page, self.__title_data, _month_to['idx'] + 1, crop_rect=self.__title_rect, color=(0, 255, 255))
+                self.__display_text_rect(
+                    self.title_page, self.__title_data, _month_to['idx'],     crop_rect=self.__title_rect, color=(0, 255, 255))
+                self.__display_text_rect(
+                    self.title_page, self.__title_data, _month_to['idx'] + 1, crop_rect=self.__title_rect, color=(0, 255, 255))
+        except:
+            cv2.imshow('Period', self.__title_page)
+            cv2.waitKey(1)
+
+            print(f'\nОшибка при обработке периода: {_month_fr}')
+            while True:
+                try:
+                    month_fr, year_fr = map(int, input('Введите дату начала периода в формате <номер месяца> <год>: ').split())
+                    break
+                except:
+                    print('Неправильный формат ввода, повторите попытку')
 
         self.__period = {
             'from': { 'year': year_fr, 'month': month_fr },
@@ -185,17 +204,27 @@ class Statement(object):
         ca_crop = self.__pages[0].bin[y:y + h, x:x + w]
         # cv2.imshow('ca raw', ca_crop)
 
-        ca_number_str = pytesseract.image_to_string(ca_crop, lang='eng', config=OCR_CFG_NUMERIC).strip()
+        ca_number_str = pytesseract.image_to_string(ca_crop, lang='remake', config=OCR_CFG_NUMERIC).strip()
         ca_number = re.findall(Patterns.CA, ca_number_str) or None
 
         if ca_number is None: 
-            print(f'[ERROR] Could not find correct CA: {ca_number_str}')
-            return self 
+            print('Ошибка при поиске лицевого счета')
+            while True:
+                try:
+                    cv2.imshow('CA Number', self.__pages[0].bin)
+                    cv2.waitKey(1)
+
+                    data = input('\nВведите номер лицевого счета (Без P): ')
+                    ca_number = re.findall(Patterns.CA, ca_number_str) or None
+
+                    if not ca_number:
+                        raise Exception 
+                except:
+                    print('Некорректный формат, повторите попытку')
 
         self.__ca_number = 'P' + ca_number[0]
 
         cv2.rectangle(self.__pages[0].dst, (x, y), (x + w, y + h), (0, 255, 0), 3)
-
         return self
 
     def get_address(self) -> "Statement":
@@ -226,12 +255,15 @@ class Statement(object):
         for cont in cv2.findContours(address_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]:
             if cv2.contourArea(cont) < 50:
                 cv2.fillPoly(address_crop, [cont], (0, 0, 0))
-        self.__pages[0].dst[y:y + h, x:x + w] = cv2.cvtColor(address_crop, cv2.COLOR_GRAY2BGR)
 
-        cv2.imshow('address_crop', address_crop)
+        if self.__type == 'справка':
+            cv2.GaussianBlur(address_crop, (5, 5), 0, address_crop)
+
+        self.__pages[0].dst[y:y + h, x:x + w] = cv2.cvtColor(address_crop, cv2.COLOR_GRAY2BGR)
+        # cv2.imwrite(f'photos/addr2{self.__pages[0].idx}.png', address_crop)
 
         address_list: list = pytesseract.image_to_string(
-            address_crop, lang='rus').lower().replace('.', ' ').replace(',', ' ').split()
+            address_crop, lang='remake').lower().replace('.', ' ').replace(',', ' ').split()
 
         raw_street = ''.join(
             address_list[(address_list.index('ул') + 1 if 'ул' in address_list else 0):address_list.index('д')])
@@ -260,10 +292,12 @@ class Statement(object):
         )
         table_bbox = cv2.boundingRect(table_cont)
         x, y, w, h = table_bbox
+
+        table = page.bin[y:y + h, x:x + w]
         
         total_bbox = (
-            x + w // 4 * 3, y + h // 6 * 5, 
-            w - w // 4 * 3, h - h // 6 * 5,
+            x + w // 4 * 3, int(y + h // 6 * 4.75), 
+            w - w // 4 * 3, int(h - h // 6 * 4.75),
         )
 
         cv2.rectangle(page.dst, (x, y), (x + w, y + h), (0, 255, 0), 5)
@@ -271,58 +305,104 @@ class Statement(object):
         x, y, w, h = total_bbox
         cv2.rectangle(page.dst, (x, y), (x + w, y + h), (0, 255, 255), 5)
 
+                                # cv2.getStructuringElement(cv2.MORPH_RECT, (20, 1)))
+
+        hor_line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
+        hor_lines_mask = cv2.morphologyEx(
+            table, cv2.MORPH_OPEN, hor_line_kernel, iterations=2)
+        cv2.dilate(hor_lines_mask, np.ones((5, 5), np.uint8), hor_lines_mask)
+        cv2.dilate(hor_lines_mask, hor_line_kernel, hor_lines_mask)
+
+        ver_line_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
+        ver_lines_mask = cv2.morphologyEx(
+            table, cv2.MORPH_OPEN, ver_line_kernel, iterations=2)
+        cv2.dilate(ver_lines_mask, np.ones((5, 5), np.uint8), ver_lines_mask)
+        cv2.dilate(ver_lines_mask, ver_line_kernel, ver_lines_mask)
+
+        table -= (struct := cv2.dilate(cv2.add(hor_lines_mask, ver_lines_mask), np.ones((11, 11), np.uint8)))
+
         total_crop = page.bin[y:y + h, x:x + w]
-        cv2.dilate(total_crop, np.ones((3, 3), np.uint8), total_crop)
-        cv2.erode(total_crop, np.ones((3, 3), np.uint8), total_crop)
+        total_mask = cv2.dilate(total_crop, 
+                                np.ones((1, 20), np.uint8))
+        cv2.dilate(total_mask, np.ones((5, 5), np.uint8), total_mask)
 
-        data_raw = pytesseract.image_to_string(total_crop, config=OCR_CFG_NUMERIC)
-        data = re.findall(Patterns.FLOAT, data_raw.replace(',', '.'))
+        cv2.imshow('mask', total_mask)
+        x, y, w, h = cv2.boundingRect(
+            max(
+                [
+                    cont 
+                    for cont in cv2.findContours(total_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
+                    if cv2.contourArea(cont) > 1000
+                ],
+                key=lambda cont: (cv2.contourArea(cont), cv2.boundingRect(cont)[1])
+            )
+        )
 
-        self.__total = 0
+        total_crop = total_crop[y:y + h, x:x + w]
+        hh = int(h * 1.00)
+        ww = int(w * 0.05)
+
+        row_bg = np.zeros((h + 2 * hh, w + 2 * ww), np.uint8)
+        row_bg[hh:h + hh, ww:w + ww] = total_crop
+        total_crop = row_bg
+        cv2.GaussianBlur(total_crop, (5, 5), 0, total_crop)
+
+        # cv2.imshow('table', table)
+        cv2.imshow('total_crop', total_crop)
+        # cv2.imshow('total_struct', struct)
+
+        data_raw = pytesseract.image_to_data(total_crop, lang='remake', config=OCR_CFG_NUMERIC, output_type=pytesseract.Output.DICT)
         try:
+            print(data_raw['text'])
+            idx = max(
+                [
+                    i 
+                    for i in range(len(data_raw['text']))
+                    if re.findall(Patterns.FLOAT, data_raw['text'][i].replace(',', '.'))
+                ], key=lambda i: data_raw['top'][i]
+            )
+
+            data = re.findall(Patterns.FLOAT, data_raw['text'][idx].replace(',', '.'))
             self.__total = float(data[0])
 
             cv2.putText(
                 page.dst, str(self.__total), 
                 (table_bbox[0], table_bbox[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 5)
-
-            print(self.__total)
         except:
-            print(f'Fail while getting total summ: {data_raw}')
-            x, y, w, h = total_bbox
-            fail_mask = np.zeros(page.src[y:y + h, x:x + w].shape, np.uint8)
+            cv2.imshow('table', table)
+            cv2.waitKey(1)
 
-            cv2.rectangle(fail_mask, (x, y), (x + w, y + h), (0, 0, 255), -1)
-            page.dst[y:y + h, x:x + w] = cv2.addWeighted(page.dst[y:y + h, x:x + w], 0.5, fail_mask, 0.5, 1.0)
+            print(data_raw['text'])
+            print(f'\nОшибка при поиске итоговой суммы. ', end='')
 
-        # data_raw = pytesseract.image_to_string(table_crop, config=OCR_CFG_NUMERIC).replace(',', '.')
-        # data = re.findall(Patterns.FLOAT, data_raw)
-        #
-        # self.__total = 0 
-        # try: 
-        #     self.__total = float(data[0])
-        #
-        #     print(self.__total)
-        #
-        # except: 
-            # x, y, w, h = table_bbox
-            # fail_mask = np.zeros(page.dst[y:y + h, x:x + w].shape, np.uint8)
+            while True:
+                try:
+                    data = input('Введите итоговую сумму: ')
+                    self.__total = float(data)
+
+                    cv2.putText(
+                        page.dst, str(self.__total), 
+                        (table_bbox[0], table_bbox[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 5)
+                    break
+                except:
+                    print('Неправильный формат ввода. Повторите попытку')
+
+            # x, y, w, h = total_bbox
+            # fail_mask = np.zeros(page.src[y:y + h, x:x + w].shape, np.uint8)
             #
-            # cv2.fillPoly(fail_mask, [rows_conts[-1]], (0, 0, 255))
+            # cv2.rectangle(fail_mask, (x, y), (x + w, y + h), (0, 0, 255), -1)
             # page.dst[y:y + h, x:x + w] = cv2.addWeighted(page.dst[y:y + h, x:x + w], 0.5, fail_mask, 0.5, 1.0)
+        while cv2.waitKey(1) != ord('n'): pass
 
         return self
 
     def get_account_total(self) -> "Statement":
         page = self.__pages[-1]
 
-        cv2.imshow('page', page.bin)
-
         total: Union[dict, None] = None
-        data = pytesseract.image_to_data(page.bin, lang='rus', output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(page.bin, lang='remake', output_type=pytesseract.Output.DICT)
         for i in range(len(data['text'])):
             string = data['text'][i]
-
 
         return self
 
@@ -336,14 +416,11 @@ class Statement(object):
             case "реестр":
                 self.get_ca_number()
                 self.__fine_table = parse_table(self.__pages)
-                # self.__fine_table = parse_table(
-                #     [page.bin for page in self.__pages],
-                #     [page.idx for page in self.__pages],
-                # )
 
             case "расчет":
-                self.get_period().get_ca_number().get_account_total()
+                self.get_period().get_ca_number()
 
+        cv2.destroyAllWindows()
         return self.__generate_description()
 
     def __process_title(self) -> "Statement":
@@ -359,7 +436,7 @@ class Statement(object):
         ]
 
         self.__title_data: dict = pytesseract.image_to_data(
-            self.__title_page, lang='rus', output_type=pytesseract.Output.DICT)
+            self.__title_page, lang='remake', output_type=pytesseract.Output.DICT)
 
         # cv2.rectangle(self.__pages[0].dst, 
         #               (self.__title_rect[0], self.__title_rect[1]), 
@@ -378,7 +455,7 @@ class Statement(object):
             'period': self.__period,
             'address': self.__address,
             'ca_number': self.__ca_number,
-            'fine_table': _fine_table_value,
+            'fine_table': self.__fine_table,
         }
 
         return self.__description
@@ -437,6 +514,10 @@ class Statement(object):
 
     @property
     def description(self):
+        return self.__description
+
+    @property
+    def report(self):
         return self.__description
 
     @property 

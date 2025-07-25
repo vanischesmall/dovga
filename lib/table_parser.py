@@ -9,6 +9,7 @@ from typing import Union
 from cv2.typing import Rect
 
 from .page import Page
+from . import ocr
 from . import utils
 from .regexs import get_float, Patterns
 from collections import defaultdict
@@ -20,6 +21,8 @@ def parse_table(pages: list[Page]) -> defaultdict:
     table_data = defaultdict(float) 
 
     for page_idx, page in enumerate(pages): 
+        # cv2.GaussianBlur(page.bin, (5, 5), 0, page.bin)
+
         table_cont = max(
             [
                 cont
@@ -74,6 +77,12 @@ def parse_table(pages: list[Page]) -> defaultdict:
         table &= cols_mask
         table -= (table_struct := cv2.add(ver_lines_mask, hor_lines_mask))
 
+        # cv2.imshow('table', table)
+        # cv2.imwrite(f'photos/reestr2{page_idx}.png', table)
+
+        # while cv2.waitKey(1) != ord('n'): pass
+        
+
         # cv2.imshow('cols mask', cols_mask)
         # cv2.imshow('table', table)
         # cv2.imshow('hor', hor_lines_mask)
@@ -86,7 +95,15 @@ def parse_table(pages: list[Page]) -> defaultdict:
             x, y, w, h = cv2.boundingRect(row_cont)
             row = (table & cv2.fillPoly(np.zeros(table.shape, np.uint8), [row_cont], (255, 255, 255)))[y:y + h, x:x + w]
 
-            raw_data = pytesseract.image_to_string(row, config=OCR_CFG_NUMERIC)
+            hh = int(h * 1.00)
+            ww = int(w * 0.05)
+
+            row_bg = np.zeros((h + 2 * hh, w + 2 * ww), np.uint8)
+            row_bg[hh:h + hh, ww:w + ww] = row
+            row = row_bg
+
+            # raw_data = pytesseract.image_to_string(row, config=OCR_CFG_NUMERIC)
+            raw_data = ocr.string(row, config=ocr.Config.NUMERIC)
             data = re.findall(Patterns.FLOAT, raw_data.replace(',', '.'))
 
             date = None
@@ -95,10 +112,38 @@ def parse_table(pages: list[Page]) -> defaultdict:
                 date = data[0]
                 fine = float(data[1])
 
-                print(date, fine, sep='\t')
+                # print(date, fine, sep='\t')
             except:
-                cv2.fillPoly(fail_mask, [row_cont], (0, 0, 255))
-                print(f'Invalid OCR output on page {page_idx}: {raw_data}')
+                cv2.GaussianBlur(row, (5, 5), 0, row)
+
+                raw_data = ocr.string(row, config=ocr.Config.NUMERIC)
+                data = re.findall(Patterns.FLOAT, raw_data.replace(',', '.'))
+
+                try:
+                    date = data[0]
+                    fine = float(data[1])
+
+                    # print(date, fine, sep='\t')
+                except:
+                    cv2.imshow('Row', row)
+                    cv2.waitKey(1)
+
+                    print(f'Invalid OCR output on page {page_idx}: {raw_data}')
+                    while True:
+                        try:
+                            data = input(
+                                'Введите данные строки в формате <дата> <пени>. Если строка некорекктна, нажмите Enter: ')
+                            if data:
+                                # print(data)
+                                data = re.findall(Patterns.FLOAT, data.replace(',', '.'))
+                                # print(data)
+
+                                date = data[0]
+                                fine = float(data[1])
+                                cv2.fillPoly(fail_mask, [row_cont], (0, 0, 255))
+                            break
+                        except:
+                            print('Неправильный формат ввода. Повторите попытку')
 
             if date is not None:
                 table_data[date] += fine
@@ -110,6 +155,9 @@ def parse_table(pages: list[Page]) -> defaultdict:
         x, y, w, h = table_bbox 
         page.dst[y:y + h, x:x + w] = cv2.addWeighted(page.dst[y:y + h, x:x + w], 0.5, fail_mask, 0.5, 1.0)
         # while cv2.waitKey(1) != ord('n'): pass
+        # cv2.destroyAllWindows()
+    # for k, v in table_data.items():
+    #     print(type(k), type(v))
 
     return table_data
 

@@ -16,7 +16,7 @@ class DocumentParser:
 
         self.__doc_len = len(self.__doc_src)
         self.__doc_end = False
-        self.__page_idx = 27
+        self.__page_idx = 0
 
         logging.info(f'Pages scanned: {self.__doc_len}')
 
@@ -26,22 +26,23 @@ class DocumentParser:
         while True: 
             page = Page(*self.__get_page()).process()
             statement.add_page(page)
+            print(f'Страница {page.idx} обрабатывается...')
 
             if page.sealed: 
                 break 
 
+        # print('Заявление на странице', statement.pages[0].idx, 'обработано!')
+        print('Заявление обработано!\n')
         statement.process() 
 
-        print(dumps(statement.description, indent=4, ensure_ascii=False))
-        print()
 
 
-        for page in statement.pages: 
-            cv2.imshow(f'Page {page.idx}', page.dst)
-        while cv2.waitKey(1) != ord('n'): pass
+        # for page in statement.pages: 
+        #     cv2.imshow(f'Page {page.idx}', page.dst)
+        # while cv2.waitKey(1) != ord('n'): pass
         cv2.destroyAllWindows()
 
-        return None
+        return statement
 
     def __get_page(self) -> tuple[int, np.ndarray]: 
         page = self.__doc_src[self.__page_idx]
