@@ -357,7 +357,7 @@ class Statement(object):
                 [
                     i 
                     for i in range(len(data_raw['text']))
-                    if re.findall(Patterns.FLOAT, data_raw['text'][i].replace(',', '.'))
+                    if re.findall(Patterns.FLOAT, data_raw['text'][i].replace(',', '.')) and data_raw['conf'][i] > TEXT_CONFIDENCE
                 ], key=lambda i: data_raw['top'][i]
             )
 
@@ -385,6 +385,7 @@ class Statement(object):
                     break
                 except:
                     print('Неправильный формат ввода. Повторите попытку')
+                cv2.destroyAllWindows()
 
             # x, y, w, h = total_bbox
             # fail_mask = np.zeros(page.src[y:y + h, x:x + w].shape, np.uint8)

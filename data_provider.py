@@ -23,10 +23,10 @@ def get_debts_data():
     """Возвращает данные и может сразу генерировать документы"""
     return DEBTS_DATA
 
-def generate_all_documents():
+def generate_all_documents(SS):
     """Генерирует все документы для всех данных"""
     cases = []
-    for json_data in DEBTS_DATA:
+    for json_data in SS:
         result = generate_documents(json_data)
         if result:
             cases.append(result['data'])
@@ -34,7 +34,3 @@ def generate_all_documents():
     if cases:
         excel_path = generate_excel_report(cases)
         print(f"Excel отчет создан: {excel_path}")
-
-# Если нужно сразу генерировать при импорте:
-if __name__ == "__main__":
-    generate_all_documents()

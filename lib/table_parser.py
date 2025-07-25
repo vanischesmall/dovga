@@ -141,9 +141,11 @@ def parse_table(pages: list[Page]) -> defaultdict:
                                 date = data[0]
                                 fine = float(data[1])
                                 cv2.fillPoly(fail_mask, [row_cont], (0, 0, 255))
+
                             break
                         except:
                             print('Неправильный формат ввода. Повторите попытку')
+                        cv2.destroyAllWindows()
 
             if date is not None:
                 table_data[date] += fine

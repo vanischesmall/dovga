@@ -1,12 +1,14 @@
+import argparse
 import logging
-from json import dumps
+from datetime import datetime
 
 
 from lib.document_parser import DocumentParser
 from lib.text_opetations import text_confidence
-from make_document import generate_documents, generate_excel_report
+from data_provider import generate_all_documents
 
-SCAN_PATH = 'assets/input2.pdf'
+
+today = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from collections import Counter
 
@@ -53,22 +55,24 @@ def get_perd(period):
 def get_addr(rep) -> str:
     return f"{rep['address']['street']} {rep['address']['house']} {rep['address']['aparts']}"
 
-def gendoc(statement):
-    result = generate_documents(statement)
-    if result is not None:
-        generate_excel_report(result['data'])
-    
-    else:
-        print('nan')
+# def gendoc(statement):
+#     result = generate_documents(statement)
+#     if result is not None:
+#         generate_excel_report(result['data'], today=str(datetime.now().strftime("%Y%m%d")))
+#     else:
+#         print('nan')
 
-def main():
+def main(scan_path: str):
+
+    today = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
     print()
 
     reports = list()
     statements = list()
 
-    doc_parser = DocumentParser(path=SCAN_PATH)
+    doc_parser = DocumentParser(path=scan_path)
     while True:
         statement = doc_parser.collect_statement()
         reports.append(statement.report)
@@ -79,6 +83,8 @@ def main():
         if doc_parser.end:
             print('Конец!')
             break
+
+    SS = list()
 
     _reports = reports.copy()
     while _reports:
@@ -122,16 +128,23 @@ def main():
             'period': period,
             'ca_number': ca_number
         }
-        print('\n\n==========================================')
+        # print('\n\n==========================================')
         # print(statement)
-        print(dumps(statement, indent=4, ensure_ascii=False))
+        # print(dumps(statement, indent=4, ensure_ascii=False))
 
-        gendoc(statement)
+        SS.append(statement)
 
+    # print(len(SS))
+    #
+    # for statement in SS: 
+    #     print('\n\n==========================================')
+    #     print(dumps(statement, indent=4, ensure_ascii=False))
 
-    print(len(statements))
-    # for statement in statements: 
+    generate_all_documents(SS)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("path")
+
+    main(parser.parse_args().path)

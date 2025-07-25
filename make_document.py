@@ -15,6 +15,10 @@ from openpyxl.styles import Font, Alignment
 import json
 from datetime import datetime
 
+
+# OFFICE = 'soffice'
+OFFICE = 'libreoffice'
+
 locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 
 ADDRESS_ABBREVIATIONS = {
@@ -148,7 +152,7 @@ def process_json_data(json_data):
 
         # Конвертация в PDF
         try:
-            subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', 
+            subprocess.run([OFFICE, '--headless', '--convert-to', 'pdf', '--outdir', 
                            os.path.dirname(pdf_path), docx_path], check=True)
             print(f"\nДокументы успешно созданы:\n{docx_path}\n{pdf_path}")
         except subprocess.CalledProcessError as e:
@@ -434,7 +438,6 @@ def create_excel_report(data_list, filename):
     wb.save(report_path)
     print(f"\nExcel-отчёт сохранён: {report_path}")
 
-
 def create_word_document(data):
     doc = Document()
     
@@ -604,12 +607,12 @@ def create_word_document(data):
     
     return doc
 
-def generate_documents(json_data, output_dir="documents"):
+def generate_documents(json_data, output_dir_pdf="documents_pdf", output_dir_docx="documents_docx"):
     """Генерирует все документы (Word, PDF, Excel) для одного дела"""
     try:
         # Создаем папку для документов, если ее нет
-        os.makedirs(output_dir, exist_ok=True)
-        
+        os.makedirs(output_dir_docx, exist_ok=True)
+        os.makedirs(output_dir_pdf, exist_ok=True)
         # Преобразуем данные в нужный формат
         data = load_data_from_json(json_data)
         
@@ -621,14 +624,14 @@ def generate_documents(json_data, output_dir="documents"):
         base_filename = f'Заявление_{data["address_for_filename"]}'
         
         # Сохраняем Word
-        docx_path = os.path.join(output_dir, f'{base_filename}.docx')
+        docx_path = os.path.join(output_dir_docx, f'{base_filename}.docx')
         doc.save(docx_path)
         
         # Конвертируем в PDF
-        pdf_path = os.path.join(output_dir, f'{base_filename}.pdf')
+        pdf_path = os.path.join(output_dir_pdf, f'{base_filename}.pdf')
         try:
-            subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', 
-                           output_dir, docx_path], check=True)
+            subprocess.run([OFFICE, '--headless', '--convert-to', 'pdf', '--outdir', 
+                           output_dir_pdf, output_dir_docx, docx_path], check=True)
         except subprocess.CalledProcessError:
             print(f"Ошибка конвертации в PDF. Убедитесь, что LibreOffice установлен.")
         
@@ -639,7 +642,7 @@ def generate_documents(json_data, output_dir="documents"):
         }
     
     except Exception as e:
-        print(f"Ошибка генерации документов: {e}")
+        print(f"Ошибка генерации документов: {str(e)}")
         return None
 
 def generate_excel_report(data_list, output_dir="reports"):
@@ -674,14 +677,15 @@ if __name__ == "__main__":
             
             # Сохранение документов
             today = datetime.now().strftime("%Y%m%d_%H%M%S")
-            os.makedirs("documents", exist_ok=True)
-            docx_path = os.path.join("documents", f'Заявление_{data["address_for_filename"]}.docx')
-            pdf_path = os.path.join("documents", f'Заявление_{data["address_for_filename"]}.pdf')
+            os.makedirs("documents_docx", exist_ok=True)
+            os.makedirs("documents_pdf", exist_ok=True)
+            docx_path = os.path.join("documents_docx", f'Заявление_{data["address_for_filename"]}.docx')
+            pdf_path = os.path.join("documents_pdf", f'Заявление_{data["address_for_filename"]}.pdf')
             doc.save(docx_path)
 
             # Конвертация в PDF
             try:
-                subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', 
+                subprocess.run([OFFICE, '--headless', '--convert-to', 'pdf', '--outdir', 
                                os.path.dirname(pdf_path), docx_path], check=True)
                 print(f"\nДокументы успешно созданы:\n{docx_path}\n{pdf_path}")
             except subprocess.CalledProcessError as e:
