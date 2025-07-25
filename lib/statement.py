@@ -326,7 +326,7 @@ class Statement(object):
                                 np.ones((1, 20), np.uint8))
         cv2.dilate(total_mask, np.ones((5, 5), np.uint8), total_mask)
 
-        cv2.imshow('mask', total_mask)
+        # cv2.imshow('mask', total_mask)
         x, y, w, h = cv2.boundingRect(
             max(
                 [
@@ -348,12 +348,11 @@ class Statement(object):
         cv2.GaussianBlur(total_crop, (5, 5), 0, total_crop)
 
         # cv2.imshow('table', table)
-        cv2.imshow('total_crop', total_crop)
+        # cv2.imshow('total_crop', total_crop)
         # cv2.imshow('total_struct', struct)
 
         data_raw = pytesseract.image_to_data(total_crop, lang='remake', config=OCR_CFG_NUMERIC, output_type=pytesseract.Output.DICT)
         try:
-            print(data_raw['text'])
             idx = max(
                 [
                     i 
@@ -372,7 +371,7 @@ class Statement(object):
             cv2.imshow('table', table)
             cv2.waitKey(1)
 
-            print(data_raw['text'])
+            # print(data_raw['text'])
             print(f'\nОшибка при поиске итоговой суммы. ', end='')
 
             while True:
@@ -392,7 +391,7 @@ class Statement(object):
             #
             # cv2.rectangle(fail_mask, (x, y), (x + w, y + h), (0, 0, 255), -1)
             # page.dst[y:y + h, x:x + w] = cv2.addWeighted(page.dst[y:y + h, x:x + w], 0.5, fail_mask, 0.5, 1.0)
-        while cv2.waitKey(1) != ord('n'): pass
+        # while cv2.waitKey(1) != ord('n'): pass
 
         return self
 
