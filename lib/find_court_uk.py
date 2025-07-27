@@ -1,6 +1,8 @@
 import pandas as pd
 import re
 
+PATH_TO_ASSETS = 'assets/'
+
 def normalize_street_name(name: str) -> str:
     """Приводит название улицы к каноничному виду без 'ул.', 'просп.' и т.п."""
     name = str(name).lower()
@@ -47,7 +49,6 @@ def load_and_prepare(path: str, name_col: str, split_by_comma: bool):
 
 def load_uk_info(path: str):
     df = pd.read_excel(path, dtype=str)
-    # Переименовываем колонки
     df = df.rename(columns={
         df.columns[0]: 'uk',
         df.columns[1]: 'number',
@@ -107,10 +108,10 @@ def get_address_info(street=None, house=None, appart=None):
         house = str(house)
         appart = str(appart)
 
-    courts_df = load_and_prepare('Суды.xlsx', name_col='court', split_by_comma=False)
-    uk_df = load_and_prepare('УправляющиеКомпании.xlsx', name_col='uk', split_by_comma=True)
-    uk_info_df = load_uk_info('Данные_о_УК.xlsx')
-    court_regions_df = load_court_regions('Данные_о_судах.xlsx')
+    courts_df = load_and_prepare(f'{PATH_TO_ASSETS}Суды.xlsx', name_col='court', split_by_comma=False)
+    uk_df = load_and_prepare(f'{PATH_TO_ASSETS}УправляющиеКомпании.xlsx', name_col='uk', split_by_comma=True)
+    uk_info_df = load_uk_info(f'{PATH_TO_ASSETS}Данные_о_УК.xlsx')
+    court_regions_df = load_court_regions(f'{PATH_TO_ASSETS}Данные_о_судах.xlsx')
 
     normalized_street = normalize_street_name(street)
     house_parts = re.findall(r'\d+\w*|[а-яa-z]+[\d/]*', house.lower())

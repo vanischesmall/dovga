@@ -618,15 +618,12 @@ def generate_documents(json_data, output_dir_pdf="documents_pdf", output_dir_doc
         # Генерируем Word документ
         doc = create_word_document(data)
         
-        # Сохраняем документы
         today = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_filename = f'Заявление_{data["address_for_filename"]}'
         
-        # Сохраняем Word
         docx_path = os.path.join(output_dir_docx, f'{base_filename}.docx')
         doc.save(docx_path)
         
-        # Конвертируем в PDF
         pdf_path = os.path.join(output_dir_pdf, f'{base_filename}.pdf')
         try:
             subprocess.run([OFFICE, '--headless', '--convert-to', 'pdf', '--outdir', 
@@ -659,50 +656,3 @@ def generate_excel_report(data_list, output_dir="reports"):
         print('excel error')
         print(f"Ошибка генерации Excel отчета: {str(e)}")
         return None
-    
-if __name__ == "__main__":    
-    cases = []
-    
-    # Получаем данные из внешнего источника
-    
-    for json_data in debts_data:
-        # Обрабатываем каждое дело из списка
-        try:
-            # Преобразуем данные в нужный формат
-            data = load_data_from_json(json_data)
-            
-            # Создаём документ Word
-            doc = create_word_document(data)
-            
-            # Сохранение документов
-            today = datetime.now().strftime("%Y%m%d_%H%M%S")
-            os.makedirs("documents_docx", exist_ok=True)
-            os.makedirs("documents_pdf", exist_ok=True)
-            docx_path = os.path.join("documents_docx", f'Заявление_{data["address_for_filename"]}.docx')
-            pdf_path = os.path.join("documents_pdf", f'Заявление_{data["address_for_filename"]}.pdf')
-            doc.save(docx_path)
-
-            # Конвертация в PDF
-            try:
-                subprocess.run([OFFICE, '--headless', '--convert-to', 'pdf', '--outdir', 
-                               os.path.dirname(pdf_path), docx_path], check=True)
-                print(f"\nДокументы успешно созданы:\n{docx_path}\n{pdf_path}")
-            except subprocess.CalledProcessError as e:
-                print(f"\nОшибка конвертации. Убедитесь, что LibreOffice установлен и работает.\n"
-                    f"DOCX файл сохранён: {docx_path}\n"
-                    f"Ошибка: {e}")
-            except Exception as e:
-                print(f"\nНеизвестная ошибка: {e}\nDOCX файл сохранён: {docx_path}")
-            
-            # Добавляем данные в список для Excel-отчёта
-            cases.append(data)
-            
-        except Exception as e:
-            print(f"Ошибка обработки данных: {str(e)}")
-            continue
-    
-    # Создаём сводный Excel-отчёт
-    if cases:
-        today = datetime.now().strftime("%Y%m%d")
-        excel_filename = f"Судебные_приказы_{today}.xlsx"
-        create_excel_report(cases, excel_filename)
