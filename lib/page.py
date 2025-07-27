@@ -21,7 +21,7 @@ class Page(object):
         self.__sealed = False
 
     def process(self) -> "Page":
-        return self.autorotate().check_seal().preprocess()
+        return self.autorotate().preprocess()
 
     def check_seal(self) -> "Page":
         mask = cv2.inRange(cv2.cvtColor(self.__src, cv2.COLOR_BGR2HSV), *Page.SEAL_HSV)

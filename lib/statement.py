@@ -1,4 +1,4 @@
-from logging import exception
+import os
 import re
 import cv2 
 import numpy as np
@@ -20,7 +20,7 @@ TEXT_CONFIDENCE = 60
 CYRRILLIC_ALPHABET = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789'.lower()
 OCR_CFG_NUMERIC = r'--oem 3 --psm 6 -c tessedit_char_whitelist=-.0123456789'
 
-STREETS = [street.strip() for street in open('./assets/streets.txt')]
+STREETS = [street.strip() for street in open(os.path.join('assets', 'streets.txt'))]
 
 
 
@@ -84,7 +84,7 @@ class Statement(object):
         self.__process_title() 
 
         for i in range(len(self.__title_data['text'])):
-            if not self.__title_data['text'][i]:# or self.__title_data['conf'][i] < TEXT_CONFIDENCE:
+            if not self.__title_data['text'][i]:
                 continue
 
             for statement_type, statement_pattern in Statement.TYPES.items():
@@ -396,15 +396,6 @@ class Statement(object):
 
         return self
 
-    def get_account_total(self) -> "Statement":
-        page = self.__pages[-1]
-
-        total: Union[dict, None] = None
-        data = pytesseract.image_to_data(page.bin, lang='remake', output_type=pytesseract.Output.DICT)
-        for i in range(len(data['text'])):
-            string = data['text'][i]
-
-        return self
 
     def process(self) -> dict: 
         self.get_type().get_address()
@@ -415,6 +406,9 @@ class Statement(object):
 
             case "реестр":
                 self.get_ca_number()
+                for page in self.__pages[1:]:
+                    page.process()
+
                 self.__fine_table = parse_table(self.__pages)
 
             case "расчет":
@@ -424,6 +418,8 @@ class Statement(object):
         return self.__generate_description()
 
     def __process_title(self) -> "Statement":
+        self.__pages[0].process()
+
         H, W = self.__pages[0].bin.shape
 
         self.__title_rect: tuple[int, ...] = tuple(map(int, (

@@ -2,10 +2,9 @@ import argparse
 import logging
 from datetime import datetime
 
-
+from lib.data_provider import generate_all_documents
 from lib.document_parser import DocumentParser
 from lib.text_opetations import text_confidence
-from data_provider import generate_all_documents
 
 
 today = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -70,15 +69,10 @@ def main(scan_path: str):
     print()
 
     reports = list()
-    statements = list()
-
     doc_parser = DocumentParser(path=scan_path)
     while True:
         statement = doc_parser.collect_statement()
         reports.append(statement.report)
-
-        # print(dumps(statement.description, indent=4, ensure_ascii=False))
-        # print()
 
         if doc_parser.end:
             print('Конец!')
@@ -86,14 +80,14 @@ def main(scan_path: str):
 
     SS = list()
 
-    _reports = reports.copy()
-    while _reports:
-        rep = _reports[0]
-        reps = sorted(_reports, key=lambda _rep: text_confidence(get_addr(rep), get_addr(_rep)))[:3]
+    # _reports = reports.copy()
+    while reports:
+        rep = reports[0]
+        reps = sorted(reports, key=lambda _rep: text_confidence(get_addr(rep), get_addr(_rep)))[:3]
 
         _statement = {}
         for _rep in reps:
-            _reports.remove(_rep)
+            reports.remove(_rep)
 
             typ = _rep['type'] 
             if typ == 'реестр':
@@ -133,13 +127,6 @@ def main(scan_path: str):
         # print(dumps(statement, indent=4, ensure_ascii=False))
 
         SS.append(statement)
-
-    # print(len(SS))
-    #
-    # for statement in SS: 
-    #     print('\n\n==========================================')
-    #     print(dumps(statement, indent=4, ensure_ascii=False))
-
     generate_all_documents(SS)
 
 

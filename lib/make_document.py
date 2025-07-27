@@ -7,17 +7,16 @@ import datetime
 import subprocess
 import os
 from docx.shared import Pt, Inches
-from find_court_uk import get_address_info
+from .find_court_uk import get_address_info
 from datetime import datetime
 import locale
 import openpyxl
 from openpyxl.styles import Font, Alignment
-import json
 from datetime import datetime
 
 
-# OFFICE = 'soffice'
-OFFICE = 'libreoffice'
+OFFICE = 'soffice'
+# OFFICE = 'libreoffice'
 
 locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 
@@ -657,6 +656,7 @@ def generate_excel_report(data_list, output_dir="reports"):
         
         return excel_path
     except Exception as e:
+        print('excel error')
         print(f"Ошибка генерации Excel отчета: {str(e)}")
         return None
     
@@ -664,7 +664,6 @@ if __name__ == "__main__":
     cases = []
     
     # Получаем данные из внешнего источника
-    debts_data = get_debts_data()
     
     for json_data in debts_data:
         # Обрабатываем каждое дело из списка

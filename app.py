@@ -28,7 +28,7 @@ def main(page: ft.Page):
         try:
             # Здесь передаём путь в make_document.py
             subprocess.Popen(
-                ["python", "make_document.py", file_path],
+                ["python", "main.py", file_path],
                 creationflags=subprocess.CREATE_NEW_CONSOLE
             )
             status_text.value = "Обработка запущена в новом окне"

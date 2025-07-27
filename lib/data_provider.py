@@ -1,5 +1,5 @@
 # data_provider.py
-from make_document import generate_documents, generate_excel_report
+from .make_document import generate_documents, generate_excel_report
 
 # Ваши данные
 DEBTS_DATA = [

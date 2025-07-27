@@ -24,21 +24,22 @@ class DocumentParser:
         statement = Statement()
 
         while True: 
-            page = Page(*self.__get_page()).process()
+            page = Page(*self.__get_page()).check_seal()
             statement.add_page(page)
-            print(f'Страница {page.idx} обрабатывается...')
 
+            print(f'Страница {page.idx} обрабатывается...')
             if page.sealed: 
                 break 
 
-        # print('Заявление на странице', statement.pages[0].idx, 'обработано!')
         print('Заявление обработано!\n')
         statement.process() 
 
-
-
         # for page in statement.pages: 
-        #     cv2.imshow(f'Page {page.idx}', page.dst)
+        #     cv2.imshow(f'Page {page.idx}', page.src)
+            # cv2.imshow(f'Page {page.idx}', page.dst)
+        #     cv2.imwrite(f'page{page.idx}.png', page.dst)
+        # cv2.imwrite(f'page{statement.pages[0].idx}.png', statement.pages[0].dst)
+        # cv2.imshow('Statement Title', statement.pages[0].dst)
         # while cv2.waitKey(1) != ord('n'): pass
         cv2.destroyAllWindows()
 

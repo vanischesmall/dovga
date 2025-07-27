@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "easyocr>=1.7.2",
+    "fastapi>=0.116.1",
     "flet[all]==0.28.3",
     "img2table>=1.4.1",
     "imutils>=0.5.4",
@@ -19,5 +20,6 @@ dependencies = [
     "prettyprint>=0.1.5",
     "pytesseract>=0.3.13",
     "python-docx>=1.2.0",
+    "python-multipart>=0.0.20",
     "scikit-image>=0.24.0",
 ]
